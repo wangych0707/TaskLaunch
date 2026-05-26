@@ -1,0 +1,42 @@
+[
+  {
+    "id": "example-task-1",
+    "title": "完成实验报告",
+    "description": "整理韦氏摆实验数据并写理论分析",
+    "status": "doing",
+    "workspaceName": "实验报告写作环境",
+    "launchItems": [
+      {
+        "id": "item-1",
+        "type": "file",
+        "name": "韦氏摆实验报告",
+        "path": "D:\\Reports\\韦氏摆实验.docx",
+        "order": 0
+      },
+      {
+        "id": "item-2",
+        "type": "file",
+        "name": "实验数据",
+        "path": "D:\\Data\\experiment.xlsx",
+        "order": 1
+      },
+      {
+        "id": "item-3",
+        "type": "app",
+        "name": "VS Code",
+        "path": "C:\\Users\\You\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe",
+        "order": 2
+      },
+      {
+        "id": "item-4",
+        "type": "url",
+        "name": "Overleaf",
+        "path": "https://www.overleaf.com",
+        "order": 3,
+        "delayMs": 500
+      }
+    ],
+    "createdAt": "2026-05-26T00:00:00.000Z",
+    "updatedAt": "2026-05-26T00:00:00.000Z"
+  }
+]
