@@ -98,7 +98,7 @@ npm run tauri dev
 
 ## 构建
 
-生成 Windows 安装包：
+生成 Windows Setup 安装包：
 
 ```bash
 npm run tauri build
@@ -107,7 +107,21 @@ npm run tauri build
 安装包通常位于：
 
 ```text
-src-tauri/target/release/bundle/msi/
+src-tauri/target/release/bundle/nsis/
+```
+
+该安装包是 `setup.exe` 形式，可在安装向导中选择安装路径。
+
+如果 Tauri 无法下载它内置的 NSIS 工具包，也可以使用项目内的 NSIS 脚本直接调用本机 `makensis.exe`：
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts/build-setup.ps1
+```
+
+输出路径：
+
+```text
+src-tauri/target/release/bundle/nsis/TaskLaunch_0.2.1_x64-setup.exe
 ```
 
 只生成免安装可执行文件：
