@@ -17,6 +17,10 @@ fn ensure_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(dir)
 }
 
+pub fn atomic_write_path(path: &Path, content: &str) -> Result<(), String> {
+    atomic_write(path, content)
+}
+
 fn atomic_write(path: &Path, content: &str) -> Result<(), String> {
     let parent = path.parent().ok_or("Invalid path")?;
     fs::create_dir_all(parent).map_err(|e| e.to_string())?;

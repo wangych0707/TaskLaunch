@@ -4,7 +4,16 @@
 
 TaskLaunch is a lightweight desktop task manager that lets you attach apps, files, folders, websites, and commands to each task, so you can start your work environment with one click.
 
-## Features (v0.1)
+## Features
+
+### v0.2
+
+- **Import / export** — single JSON backup (tasks + templates + settings)
+- **System tray** — close to tray, tray menu (show / launch last / quit), left-click to show window
+- **Global shortcuts** — show window (`Ctrl+Shift+T`), launch last task (`Ctrl+Shift+L`), customizable in settings
+- **Last task memory** — tray menu and hotkey restart the last successfully started task
+
+### v0.1
 
 - Task list with status: 未开始 / 进行中 / 已完成
 - Work scene per task (workspace name + launch items)
@@ -40,12 +49,6 @@ Build only the desktop executable when the local Windows Installer service is un
 npm run desktop:build
 ```
 
-仅生成 exe（跳过安装包，避免下载 WiX/NSIS 超时）：
-
-```bash
-npm run tauri build -- --bundles none
-```
-
 可执行文件路径：`src-tauri/target/release/tasklaunch.exe`
 
 ## Data files
@@ -55,7 +58,7 @@ Stored under the OS app data directory (shown in **设置**):
 | File | Content |
 |------|---------|
 | `tasks.json` | All tasks and launch items |
-| `settings.json` | Global `launchDelayMs` (default 400) |
+| `settings.json` | `launchDelayMs`, tray, shortcuts, `lastLaunchedTaskId` |
 | `templates.json` | Reusable templates |
 
 Writes use atomic replace (`.tmp` → rename) to reduce corruption risk.
@@ -97,7 +100,30 @@ Writes use atomic replace (`.tmp` → rename) to reduce corruption risk.
 
 See [`tasks.example.json`](tasks.example.json) for a full task sample.
 
+## Backup format
+
+Export produces `tasklaunch-backup-YYYY-MM-DD.json`:
+
+```json
+{
+  "version": "0.2",
+  "exportedAt": "2026-05-26T12:00:00+00:00",
+  "tasks": [],
+  "templates": [],
+  "settings": {
+    "launchDelayMs": 400,
+    "minimizeToTray": true,
+    "shortcutShowWindow": "Ctrl+Shift+T",
+    "shortcutLaunchLast": "Ctrl+Shift+L"
+  }
+}
+```
+
+Import supports **merge** (same id overwrites) or **replace** (full overwrite). Shortcut/tray preferences are kept when importing settings.
+
 ## Manual test checklist (Windows)
+
+**v0.1**
 
 - [ ] Create task, edit title/description/status, restart app — data persists
 - [ ] Add one item per type (app, file, folder, url, command) and **Start Task**
@@ -106,12 +132,18 @@ See [`tasks.example.json`](tasks.example.json) for a full task sample.
 - [ ] Reorder launch items (↑↓), order respected on start
 - [ ] Global delay in settings applied between items
 - [ ] Create template, new task from template copies launch items
-- [ ] Template list starts empty until the user creates one
+
+**v0.2**
+
+- [ ] Export backup, re-import with merge and replace
+- [ ] Close window → app stays in tray; tray「显示主窗口」restores
+- [ ] Start a task, then `Ctrl+Shift+L` / tray「启动上次任务」runs it again
+- [ ] `Ctrl+Shift+T` shows window when hidden
+- [ ] Change shortcuts in settings, save, verify new bindings work
 
 ## Roadmap
 
-- **v0.2** — Import/export, system tray, global shortcut
-- **v0.3** — Stronger pre-launch validation, task recovery UX
+- **v0.3** — Stronger pre-launch validation, task recovery prompt on startup
 - **v0.4** — macOS / Linux polish
 
 ## License

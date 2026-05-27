@@ -33,6 +33,24 @@ export interface Template {
 
 export interface Settings {
   launchDelayMs: number;
+  minimizeToTray?: boolean;
+  shortcutShowWindow?: string;
+  shortcutLaunchLast?: string;
+  lastLaunchedTaskId?: string;
+}
+
+export interface ImportSummary {
+  tasksImported: number;
+  templatesImported: number;
+  settingsImported: boolean;
+}
+
+export interface ExportBundle {
+  version: string;
+  exportedAt: string;
+  tasks: Task[];
+  templates: Template[];
+  settings: Settings;
 }
 
 export interface LaunchItemResult {

@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
+  ImportSummary,
   LaunchItem,
   LaunchTaskResponse,
   Settings,
@@ -40,6 +41,32 @@ export async function launchTask(
   skipIds: string[] = [],
 ): Promise<LaunchTaskResponse> {
   return invoke<LaunchTaskResponse>("launch_task", { task, skipIds });
+}
+
+export async function exportData(path: string): Promise<void> {
+  return invoke("export_data", { path });
+}
+
+export async function importData(
+  path: string,
+  mode: "replace" | "merge",
+  importSettings: boolean,
+): Promise<ImportSummary> {
+  return invoke<ImportSummary>("import_data", { path, mode, importSettings });
+}
+
+export async function showMainWindow(): Promise<void> {
+  return invoke("show_main_window");
+}
+
+export function normalizeSettings(settings: Settings): Settings {
+  return {
+    launchDelayMs: settings.launchDelayMs ?? 400,
+    minimizeToTray: settings.minimizeToTray ?? true,
+    shortcutShowWindow: settings.shortcutShowWindow ?? "Ctrl+Shift+T",
+    shortcutLaunchLast: settings.shortcutLaunchLast ?? "Ctrl+Shift+L",
+    lastLaunchedTaskId: settings.lastLaunchedTaskId,
+  };
 }
 
 export function newId(): string {

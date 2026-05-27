@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -15,13 +16,16 @@ import {
   fetchTemplates,
   launchTask,
   newId,
+  normalizeSettings,
   nowIso,
   persistSettings,
   persistTasks,
   persistTemplates,
 } from "../api";
 import type { Settings, Task, TaskStatus, Template } from "../types";
-import { ask } from "@tauri-apps/plugin-dialog";
+import { ask, message } from "@tauri-apps/plugin-dialog";
+import { listen } from "@tauri-apps/api/event";
+import { useGlobalShortcuts } from "../hooks/useGlobalShortcuts";
 
 interface AppContextValue {
   tasks: Task[];
@@ -56,7 +60,7 @@ const AppContext = createContext<AppContextValue | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [settings, setSettings] = useState<Settings>({ launchDelayMs: 400 });
+  const [settings, setSettings] = useState<Settings>(normalizeSettings({ launchDelayMs: 400 }));
   const [dataDir, setDataDir] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,7 +76,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     ]);
     setTasks(t);
     setTemplates(tmpl);
-    setSettings(s);
+    setSettings(normalizeSettings(s));
     setDataDir(dir);
     setSelectedId((prev) => {
       if (prev && t.some((x) => x.id === prev)) return prev;
@@ -149,9 +153,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const saveSettings = useCallback(async (next: Settings) => {
-    setSettings(next);
-    await persistSettings(next);
+    const normalized = normalizeSettings(next);
+    setSettings(normalized);
+    await persistSettings(normalized);
   }, []);
+
+  const tasksRef = useRef(tasks);
+  const settingsRef = useRef(settings);
+  const startTaskRef = useRef<(task: Task) => Promise<void>>(async () => {});
+  tasksRef.current = tasks;
+  settingsRef.current = settings;
 
   const createTemplate = useCallback(
     async (input: Omit<Template, "id">) => {
@@ -184,6 +195,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [templates],
   );
 
+  const rememberLastTask = useCallback(async (taskId: string) => {
+    const next = normalizeSettings({
+      ...settingsRef.current,
+      lastLaunchedTaskId: taskId,
+    });
+    setSettings(next);
+    await persistSettings(next);
+  }, []);
+
   const startTask = useCallback(
     async (task: Task) => {
       if (launchingTaskId) return;
@@ -213,6 +233,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           response = await launchTask(task, skipIds);
         }
 
+        await rememberLastTask(task.id);
+
         const failed = response.results.filter((r) => !r.success && !r.skipped);
         if (failed.length > 0) {
           setLaunchMessage(
@@ -230,8 +252,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setLaunchingTaskId(null);
       }
     },
-    [launchingTaskId],
+    [launchingTaskId, rememberLastTask],
   );
+
+  startTaskRef.current = startTask;
+
+  const launchLastTask = useCallback(async () => {
+    const taskId = settingsRef.current.lastLaunchedTaskId;
+    if (!taskId) {
+      await message("还没有启动过任务。请先在主窗口点击 Start Task。", {
+        title: "TaskLaunch",
+      });
+      return;
+    }
+    const task = tasksRef.current.find((t) => t.id === taskId);
+    if (!task) {
+      await message("上次任务已不存在，请重新选择任务。", { title: "TaskLaunch" });
+      return;
+    }
+    await startTaskRef.current(task);
+  }, []);
+
+  useGlobalShortcuts({
+    settings,
+    onLaunchLast: () => void launchLastTask(),
+    enabled: !loading,
+  });
+
+  useEffect(() => {
+    const unlisten = listen("tray-launch-last", () => {
+      void launchLastTask();
+    });
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }, [launchLastTask]);
 
   const value: AppContextValue = {
     tasks,
