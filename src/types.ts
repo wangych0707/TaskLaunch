@@ -31,12 +31,31 @@ export interface Template {
   launchItems: LaunchItem[];
 }
 
+export type ColorTheme =
+  | "mint"
+  | "dark"
+  | "light"
+  | "ocean"
+  | "sunset"
+  | "forest"
+  | "custom";
+
+export interface CustomThemeColors {
+  accent: string;
+  background: string;
+  surface?: string;
+  text?: string;
+}
+
 export interface Settings {
   launchDelayMs: number;
   minimizeToTray?: boolean;
   shortcutShowWindow?: string;
+  shortcutTaskPanel?: string;
   shortcutLaunchLast?: string;
   lastLaunchedTaskId?: string;
+  colorTheme?: ColorTheme;
+  customColors?: CustomThemeColors;
 }
 
 export interface ImportSummary {

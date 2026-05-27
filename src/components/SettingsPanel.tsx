@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { ask, message } from "@tauri-apps/plugin-dialog";
 import { useApp } from "../context/AppContext";
@@ -8,6 +8,10 @@ import {
   normalizeSettings,
 } from "../api";
 import type { Settings } from "../types";
+import { ShortcutRecorder } from "./ShortcutRecorder";
+import { ThemePicker } from "./ThemePicker";
+import { hasShortcutConflict } from "../utils/shortcuts";
+import { applyAppTheme } from "../themes";
 
 export function SettingsPanel({ onClose }: { onClose: () => void }) {
   const { settings, dataDir, saveSettings, refresh } = useApp();
@@ -18,11 +22,51 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
     setDraft((d) => ({ ...d, ...partial }));
   }
 
+  useEffect(() => {
+    applyAppTheme(normalizeSettings(draft));
+  }, [draft]);
+
+  function handleClose() {
+    applyAppTheme(normalizeSettings(settings));
+    onClose();
+  }
+
+  const shortcutConflict = hasShortcutConflict([
+    draft.shortcutShowWindow ?? "",
+    draft.shortcutTaskPanel ?? "",
+    draft.shortcutLaunchLast ?? "",
+  ]);
+
   async function handleSave() {
     const ms = Number(draft.launchDelayMs);
     if (Number.isNaN(ms) || ms < 0) return;
-    await saveSettings(normalizeSettings({ ...draft, launchDelayMs: ms }));
-    onClose();
+    if (shortcutConflict) {
+      await message("任意两个全局快捷键不能相同，请重新录制。", {
+        title: "快捷键冲突",
+        kind: "error",
+      });
+      return;
+    }
+    const saved = normalizeSettings({
+      ...draft,
+      launchDelayMs: ms,
+      shortcutShowWindow: draft.shortcutShowWindow?.trim() ?? "",
+      shortcutTaskPanel: draft.shortcutTaskPanel?.trim() ?? "",
+      shortcutLaunchLast: draft.shortcutLaunchLast?.trim() ?? "",
+    });
+    setBusy(true);
+    try {
+      await saveSettings(saved);
+      applyAppTheme(saved);
+      onClose();
+    } catch (e) {
+      await message(e instanceof Error ? e.message : String(e), {
+        title: "设置保存失败",
+        kind: "error",
+      });
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function handleExport() {
@@ -86,9 +130,21 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={handleClose}>
       <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
         <h3>设置</h3>
+
+        <section className="settings-section">
+          <h4>界面配色</h4>
+          <ThemePicker
+            value={draft.colorTheme ?? "mint"}
+            customColors={draft.customColors}
+            onChange={(colorTheme) => patch({ colorTheme })}
+            onCustomColorsChange={(customColors) =>
+              patch({ colorTheme: "custom", customColors })
+            }
+          />
+        </section>
 
         <section className="settings-section">
           <h4>启动</h4>
@@ -121,22 +177,35 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
         <section className="settings-section">
           <h4>全局快捷键</h4>
           <p className="hint">
-            格式示例：Ctrl+Shift+T、Alt+Space。修改后需点「保存」生效。
+            点击「录制」后按下组合键，保存后生效。主窗口快捷键再次按下会隐藏主窗口。
           </p>
-          <label>
-            显示主窗口
-            <input
-              value={draft.shortcutShowWindow ?? "Ctrl+Shift+T"}
-              onChange={(e) => patch({ shortcutShowWindow: e.target.value })}
-            />
-          </label>
-          <label>
-            启动上次任务
-            <input
-              value={draft.shortcutLaunchLast ?? "Ctrl+Shift+L"}
-              onChange={(e) => patch({ shortcutLaunchLast: e.target.value })}
-            />
-          </label>
+          <ShortcutRecorder
+            label="显示/隐藏主窗口"
+            value={draft.shortcutShowWindow ?? ""}
+            onChange={(shortcutShowWindow) => patch({ shortcutShowWindow })}
+            conflictWith={[
+              draft.shortcutTaskPanel ?? "",
+              draft.shortcutLaunchLast ?? "",
+            ]}
+          />
+          <ShortcutRecorder
+            label="显示/隐藏任务小窗"
+            value={draft.shortcutTaskPanel ?? ""}
+            onChange={(shortcutTaskPanel) => patch({ shortcutTaskPanel })}
+            conflictWith={[
+              draft.shortcutShowWindow ?? "",
+              draft.shortcutLaunchLast ?? "",
+            ]}
+          />
+          <ShortcutRecorder
+            label="启动上次任务"
+            value={draft.shortcutLaunchLast ?? ""}
+            onChange={(shortcutLaunchLast) => patch({ shortcutLaunchLast })}
+            conflictWith={[
+              draft.shortcutShowWindow ?? "",
+              draft.shortcutTaskPanel ?? "",
+            ]}
+          />
         </section>
 
         <section className="settings-section">
@@ -167,14 +236,14 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
         </label>
 
         <div className="modal-actions">
-          <button type="button" className="btn" onClick={onClose} disabled={busy}>
+          <button type="button" className="btn" onClick={handleClose} disabled={busy}>
             取消
           </button>
           <button
             type="button"
             className="btn primary"
             onClick={handleSave}
-            disabled={busy}
+            disabled={busy || shortcutConflict}
           >
             保存
           </button>

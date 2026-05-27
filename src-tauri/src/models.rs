@@ -63,6 +63,17 @@ pub struct Template {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CustomThemeColors {
+    pub accent: String,
+    pub background: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub surface: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Settings {
     #[serde(default = "default_launch_delay")]
     pub launch_delay_ms: u64,
@@ -70,10 +81,16 @@ pub struct Settings {
     pub minimize_to_tray: bool,
     #[serde(default = "default_shortcut_show")]
     pub shortcut_show_window: String,
+    #[serde(default = "default_shortcut_task_panel")]
+    pub shortcut_task_panel: String,
     #[serde(default = "default_shortcut_launch")]
     pub shortcut_launch_last: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_launched_task_id: Option<String>,
+    #[serde(default = "default_color_theme")]
+    pub color_theme: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub custom_colors: Option<CustomThemeColors>,
 }
 
 fn default_launch_delay() -> u64 {
@@ -88,8 +105,16 @@ fn default_shortcut_show() -> String {
     "Ctrl+Shift+T".to_string()
 }
 
+fn default_shortcut_task_panel() -> String {
+    "Ctrl+Alt+P".to_string()
+}
+
 fn default_shortcut_launch() -> String {
     "Ctrl+Shift+L".to_string()
+}
+
+fn default_color_theme() -> String {
+    "mint".to_string()
 }
 
 impl Default for Settings {
@@ -98,8 +123,11 @@ impl Default for Settings {
             launch_delay_ms: default_launch_delay(),
             minimize_to_tray: default_minimize_to_tray(),
             shortcut_show_window: default_shortcut_show(),
+            shortcut_task_panel: default_shortcut_task_panel(),
             shortcut_launch_last: default_shortcut_launch(),
             last_launched_task_id: None,
+            color_theme: default_color_theme(),
+            custom_colors: None,
         }
     }
 }

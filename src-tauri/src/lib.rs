@@ -1,8 +1,10 @@
 mod import_export;
 mod launcher;
 mod models;
+mod shortcuts;
 mod storage;
 mod tray;
+mod windows;
 
 use models::{
     ImportSummary, LaunchTaskResponse, Settings, Task, Template,
@@ -26,6 +28,11 @@ fn get_settings(app: AppHandle) -> Result<Settings, String> {
 
 #[tauri::command]
 fn save_settings(app: AppHandle, settings: Settings) -> Result<(), String> {
+    let previous = storage::load_settings(&app).unwrap_or_default();
+    if let Err(error) = shortcuts::register_from_settings(&app, &settings) {
+        let _ = shortcuts::register_from_settings(&app, &previous);
+        return Err(error);
+    }
     storage::save_settings(&app, &settings)
 }
 
@@ -61,8 +68,18 @@ fn import_data(
 
 #[tauri::command]
 fn show_main_window(app: AppHandle) -> Result<(), String> {
-    tray::show_main_window(&app);
+    windows::show_main_window(&app);
     Ok(())
+}
+
+#[tauri::command]
+fn toggle_task_panel(app: AppHandle) -> Result<bool, String> {
+    windows::toggle_task_panel(&app)
+}
+
+#[tauri::command]
+fn show_task_panel(app: AppHandle) -> Result<(), String> {
+    windows::show_task_panel(&app)
 }
 
 #[tauri::command]
@@ -83,16 +100,29 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
             tray::setup(app)?;
+            let settings = storage::load_settings(app.handle())?;
+            if let Err(error) = shortcuts::register_from_settings(app.handle(), &settings) {
+                eprintln!("failed to register global shortcuts: {error}");
+            }
             Ok(())
         })
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
-                let minimize = storage::load_settings(window.app_handle())
-                    .map(|s| s.minimize_to_tray)
-                    .unwrap_or(true);
-                if minimize {
-                    let _ = window.hide();
-                    api.prevent_close();
+                match window.label() {
+                    windows::TASK_PANEL_WINDOW => {
+                        let _ = window.hide();
+                        api.prevent_close();
+                    }
+                    windows::MAIN_WINDOW => {
+                        let minimize = storage::load_settings(window.app_handle())
+                            .map(|s| s.minimize_to_tray)
+                            .unwrap_or(true);
+                        if minimize {
+                            let _ = window.hide();
+                            api.prevent_close();
+                        }
+                    }
+                    _ => {}
                 }
             }
         })
@@ -107,6 +137,8 @@ pub fn run() {
             export_data,
             import_data,
             show_main_window,
+            toggle_task_panel,
+            show_task_panel,
             launch_task,
         ])
         .run(tauri::generate_context!())

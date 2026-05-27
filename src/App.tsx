@@ -4,6 +4,7 @@ import { TaskList } from "./components/TaskList";
 import { TaskDetail } from "./components/TaskDetail";
 import { TemplateManager } from "./components/TemplateManager";
 import { SettingsPanel } from "./components/SettingsPanel";
+import { toggleTaskPanel } from "./api";
 import "./App.css";
 
 function AppShell() {
@@ -23,6 +24,14 @@ function AppShell() {
           <span className="subtitle">一个任务，一个工作场景</span>
         </div>
         <nav className="header-nav">
+          <button
+            type="button"
+            className="btn"
+            onClick={() => void toggleTaskPanel()}
+            title="打开紧凑任务列表窗口"
+          >
+            任务小窗
+          </button>
           <button
             type="button"
             className="btn"

@@ -1,4 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
+import { emit } from "@tauri-apps/api/event";
+import { DEFAULT_CUSTOM_COLORS } from "./themes";
+import type { ColorTheme, CustomThemeColors } from "./types";
+import { normalizeHex } from "./utils/colorUtils";
 import type {
   ImportSummary,
   LaunchItem,
@@ -59,13 +63,69 @@ export async function showMainWindow(): Promise<void> {
   return invoke("show_main_window");
 }
 
+export async function toggleTaskPanel(): Promise<boolean> {
+  return invoke<boolean>("toggle_task_panel");
+}
+
+export async function showTaskPanel(): Promise<void> {
+  return invoke("show_task_panel");
+}
+
+export async function notifyDataChanged(): Promise<void> {
+  await emit("data-changed", {});
+}
+
+const PRESET_THEMES: ColorTheme[] = [
+  "mint",
+  "dark",
+  "light",
+  "ocean",
+  "sunset",
+  "forest",
+];
+
+function normalizeCustomColors(
+  colors?: CustomThemeColors,
+): CustomThemeColors {
+  const accent =
+    (colors?.accent && normalizeHex(colors.accent)) ||
+    DEFAULT_CUSTOM_COLORS.accent;
+  const background =
+    (colors?.background && normalizeHex(colors.background)) ||
+    DEFAULT_CUSTOM_COLORS.background;
+  const surface = colors?.surface ? normalizeHex(colors.surface) : null;
+  const text = colors?.text ? normalizeHex(colors.text) : null;
+  return {
+    accent,
+    background,
+    ...(surface ? { surface } : {}),
+    ...(text ? { text } : {}),
+  };
+}
+
 export function normalizeSettings(settings: Settings): Settings {
+  const theme = settings.colorTheme;
+  const colorTheme: ColorTheme =
+    theme === "custom"
+      ? "custom"
+      : theme && PRESET_THEMES.includes(theme)
+        ? theme
+        : "mint";
+
   return {
     launchDelayMs: settings.launchDelayMs ?? 400,
     minimizeToTray: settings.minimizeToTray ?? true,
     shortcutShowWindow: settings.shortcutShowWindow ?? "Ctrl+Shift+T",
+    shortcutTaskPanel: settings.shortcutTaskPanel ?? "Ctrl+Alt+P",
     shortcutLaunchLast: settings.shortcutLaunchLast ?? "Ctrl+Shift+L",
     lastLaunchedTaskId: settings.lastLaunchedTaskId,
+    colorTheme,
+    customColors:
+      colorTheme === "custom"
+        ? normalizeCustomColors(settings.customColors)
+        : settings.customColors
+          ? normalizeCustomColors(settings.customColors)
+          : undefined,
   };
 }
 

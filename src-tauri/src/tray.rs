@@ -1,14 +1,17 @@
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{App, Emitter, Manager};
+use tauri::{App, Emitter};
+
+use crate::windows;
 
 const TRAY_ID: &str = "main-tray";
 
 pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     let show_i = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
+    let panel_i = MenuItem::with_id(app, "task_panel", "任务列表小窗", true, None::<&str>)?;
     let launch_i = MenuItem::with_id(app, "launch_last", "启动上次任务", true, None::<&str>)?;
     let quit_i = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show_i, &launch_i, &quit_i])?;
+    let menu = Menu::with_items(app, &[&show_i, &panel_i, &launch_i, &quit_i])?;
 
     let icon = app
         .default_window_icon()
@@ -20,7 +23,10 @@ pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         .menu(&menu)
         .tooltip("TaskLaunch")
         .on_menu_event(|app, event| match event.id.as_ref() {
-            "show" => show_main_window(app),
+            "show" => windows::show_main_window(app),
+            "task_panel" => {
+                let _ = windows::toggle_task_panel(app);
+            }
             "launch_last" => {
                 let _ = app.emit("tray-launch-last", ());
             }
@@ -36,18 +42,10 @@ pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
                 ..
             } = event
             {
-                show_main_window(tray.app_handle());
+                windows::show_main_window(tray.app_handle());
             }
         })
         .build(app)?;
 
     Ok(())
-}
-
-pub fn show_main_window(app: &tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.show();
-        let _ = window.unminimize();
-        let _ = window.set_focus();
-    }
 }

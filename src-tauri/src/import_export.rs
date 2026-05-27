@@ -81,6 +81,8 @@ fn merge_preserved_prefs(mut imported: Settings, current: &Settings) -> Settings
     imported.shortcut_show_window = current.shortcut_show_window.clone();
     imported.shortcut_launch_last = current.shortcut_launch_last.clone();
     imported.last_launched_task_id = current.last_launched_task_id.clone();
+    imported.color_theme = current.color_theme.clone();
+    imported.custom_colors = current.custom_colors.clone();
     imported
 }
 

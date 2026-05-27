@@ -18,6 +18,7 @@ import {
   newId,
   normalizeSettings,
   nowIso,
+  notifyDataChanged,
   persistSettings,
   persistTasks,
   persistTemplates,
@@ -25,7 +26,8 @@ import {
 import type { Settings, Task, TaskStatus, Template } from "../types";
 import { ask, message } from "@tauri-apps/plugin-dialog";
 import { listen } from "@tauri-apps/api/event";
-import { useGlobalShortcuts } from "../hooks/useGlobalShortcuts";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { applyAppTheme } from "../themes";
 
 interface AppContextValue {
   tasks: Task[];
@@ -66,6 +68,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [launchMessage, setLaunchMessage] = useState<string | null>(null);
   const [launchingTaskId, setLaunchingTaskId] = useState<string | null>(null);
+  const [isMainWindow] = useState(
+    () => getCurrentWebviewWindow().label === "main",
+  );
+
+  useEffect(() => {
+    applyAppTheme(settings);
+  }, [settings.colorTheme, settings.customColors]);
 
   const refresh = useCallback(async () => {
     const [t, tmpl, s, dir] = await Promise.all([
@@ -90,9 +99,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, [refresh]);
 
+  useEffect(() => {
+    const unlisten = listen("data-changed", () => {
+      void refresh();
+    });
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }, [refresh]);
+
   const persist = useCallback(async (next: Task[]) => {
     setTasks(next);
     await persistTasks(next);
+    await notifyDataChanged();
   }, []);
 
   const selectedTask = useMemo(
@@ -156,6 +175,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const normalized = normalizeSettings(next);
     setSettings(normalized);
     await persistSettings(normalized);
+    await notifyDataChanged();
   }, []);
 
   const tasksRef = useRef(tasks);
@@ -170,6 +190,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const next = [...templates, template];
       setTemplates(next);
       await persistTemplates(next);
+      await notifyDataChanged();
       return template.id;
     },
     [templates],
@@ -182,6 +203,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       );
       setTemplates(next);
       await persistTemplates(next);
+      await notifyDataChanged();
     },
     [templates],
   );
@@ -191,6 +213,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const next = templates.filter((t) => t.id !== id);
       setTemplates(next);
       await persistTemplates(next);
+      await notifyDataChanged();
     },
     [templates],
   );
@@ -202,6 +225,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
     setSettings(next);
     await persistSettings(next);
+    await notifyDataChanged();
   }, []);
 
   const startTask = useCallback(
@@ -273,20 +297,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await startTaskRef.current(task);
   }, []);
 
-  useGlobalShortcuts({
-    settings,
-    onLaunchLast: () => void launchLastTask(),
-    enabled: !loading,
-  });
-
   useEffect(() => {
+    if (!isMainWindow) return;
     const unlisten = listen("tray-launch-last", () => {
       void launchLastTask();
     });
     return () => {
       void unlisten.then((fn) => fn());
     };
-  }, [launchLastTask]);
+  }, [isMainWindow, launchLastTask]);
+
+  useEffect(() => {
+    if (!isMainWindow) return;
+    const unlisten = listen("shortcut-launch-last", () => {
+      void launchLastTask();
+    });
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }, [isMainWindow, launchLastTask]);
 
   const value: AppContextValue = {
     tasks,
